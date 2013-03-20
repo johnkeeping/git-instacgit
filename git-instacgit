@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+import errno
+import os
+import subprocess
+import sys
+
+try:
+    from http.server import CGIHTTPRequestHandler, HTTPServer
+    from socketserver import ThreadingMixIn
+except ImportError:
+    from CGIHTTPServer import CGIHTTPRequestHandler
+    from BaseHTTPServer import HTTPServer
+    from SocketServer import ThreadingMixIn
+
+
+class CGitRequestHandler(CGIHTTPRequestHandler):
+
+    def __init__(self, cgit_path, cgit_datadir, *args):
+        self.cgit_path = cgit_path
+        self.cgit_datadir = cgit_datadir
+        CGIHTTPRequestHandler.__init__(self, *args)
+
+    def is_cgi(self):
+        if self.path == '/':
+            self.path = '/cgit/'
+        self.cgi_info = ('/cgit', self.path[5:])
+        return self.path.startswith('/cgit/')
+
+    def translate_path(self, path):
+        if path == '/cgit/':
+            return self.cgit_path
+        path = CGIHTTPRequestHandler.translate_path(self, path)
+        path = os.path.relpath(path)
+        return os.path.join(self.cgit_datadir, path)
+
+
+class CGitServer(ThreadingMixIn, HTTPServer):
+    pass
+
+
+def _decode_output(value):
+    """Decodes Git output into a unicode string.
+
+    On Python 2 this is a no-op; on Python 3 we decode the string as
+    suggested by [1] since we know that Git treats paths as just a sequence
+    of bytes and all of the output we ask Git for is expected to be a file
+    system path.
+
+    [1] http://docs.python.org/3/c-api/unicode.html#file-system-encoding
+
+    """
+    if sys.hexversion < 0x3000000:
+        return value
+    return value.decode(sys.getfilesystemencoding(), 'surrogateescape')
+
+
+def get_output(*cmd, **kwargs):
+    ignore_errors = kwargs.pop('ignore_errors', False)
+    if kwargs:
+        raise TypeError('unknown keyword argument: %s' % kwargs.keys()[0])
+
+    c = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    output = c.communicate()[0].strip()
+    output = _decode_output(output)
+    c.wait()
+    if c.returncode and not ignore_errors:
+        raise subprocess.CalledProcessError(c.returncode, c, output)
+    return output
+
+
+def get_config_path(var):
+    return get_output('git', 'config', '--path', '--get', var,
+                      ignore_errors=True)
+
+
+def create_cgitrc(git_dir, path):
+    repo_path = get_output('git', 'rev-parse', '--show-toplevel')
+    if not repo_path:
+        repo_path = git_dir
+
+    with open(path, 'w') as f:
+        f.write('''
+enable-commit-graph=1
+enable-index-links=1
+enable-log-filecount=1
+enable-log-linecount=1
+enable-git-config=1
+max-stats=year
+
+repo.url={name}
+repo.name={name}
+repo.path={path}
+'''.format(name=os.path.basename(repo_path),
+           path=git_dir))
+
+
+def write_agefile(git_dir):
+    web_dir = os.path.join(git_dir, 'info', 'web')
+    try:
+        os.makedirs(web_dir)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
+    date = get_output('git', 'for-each-ref', '--count=1',
+                      '--sort=-committerdate',
+                      '--format=%(committerdate:iso)')
+    with open(os.path.join(web_dir, 'last-modified'), 'w') as f:
+        f.write('%s\n' % date)
+
+
+def main(args):
+    git_dir = get_output('git', 'rev-parse', '--git-dir')
+    cgitrc_file = os.path.join(git_dir, 'cgitrc')
+    create_cgitrc(git_dir, cgitrc_file)
+    write_agefile(git_dir)
+
+    os.environ['CGIT_CONFIG'] = cgitrc_file
+    cgit_path = get_config_path('instacgit.script')
+    cgit_datadir = get_config_path('instacgit.datadir')
+    if not cgit_path or not cgit_datadir:
+        sys.stderr.write('''fatal: cgit not found
+
+You must tell git-instacgit how to find CGit on your system:
+
+	git config --global instacgit.script /path/to/cgit
+        git config --global instacgit.datadir /path/to/directory/
+
+"instacgit.datadir" should contain "cgit.css".
+''')
+        return 1
+
+    def handle_request(*args):
+        return CGitRequestHandler(cgit_path, cgit_datadir, *args)
+    server = CGitServer(('localhost', 8080), handle_request)
+    subprocess.Popen(['git', 'web--browse', 'http://localhost:8080/cgit/'])
+    try:
+        print('starting server')
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

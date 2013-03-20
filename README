@@ -1,0 +1,34 @@
+Instantly browse a Git repository in CGit
+=========================================
+
+This is git-instaweb for people who prefer CGit.
+
+
+Requirements
+============
+
+- Python 2.4 or later
+- Git
+- CGit
+
+
+Installation
+============
+
+Just copy "git-instacgit" into your path - no fancy setup scripts here!
+
+You then need to tell git-instacgit where to find your CGit installation:
+
+    git config --global instacgit.script /path/to/cgit
+    git config --global instacgit.datadir /path/to/datadir/
+
+"instacgit.script" points to the CGit binary.
+
+"instacgit.datadir" points to the directory containing the CGit resource
+files, "cgit.css" and "cgit.png".
+
+
+Running
+=======
+
+Type "git instacgit" inside a Git repository.
