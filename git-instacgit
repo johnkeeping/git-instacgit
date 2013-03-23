@@ -73,8 +73,11 @@ def get_output(*cmd, **kwargs):
 
 
 def get_config_path(var):
-    return get_output('git', 'config', '--path', '--get', var,
+    value = get_output('git', 'config', '--path', '--get', var,
                       ignore_errors=True)
+    if not value:
+        value = None
+    return value
 
 
 def create_cgitrc(git_dir, path):
