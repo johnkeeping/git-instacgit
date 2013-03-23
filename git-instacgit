@@ -80,6 +80,17 @@ def get_config_path(var):
     return value
 
 
+CGIT_NOT_FOUND_MESSAGE = '''fatal: cgit not found
+
+You must tell git-instacgit how to find CGit on your system:
+
+        git config --global instacgit.script /path/to/cgit
+        git config --global instacgit.datadir /path/to/directory/
+
+"instacgit.datadir" should contain "cgit.css".
+'''
+
+
 class InstaCGit(object):
 
     def __init__(self, git_dir, cgit_datadir, cgit_path=None, cgitrc_file=None):
@@ -130,16 +141,9 @@ repo.path={path}
         self.write_agefile()
 
         os.environ['CGIT_CONFIG'] = self.cgitrc_file
-        if not self.cgit_path or not self.cgit_datadir:
-            sys.stderr.write('''fatal: cgit not found
-
-You must tell git-instacgit how to find CGit on your system:
-
-        git config --global instacgit.script /path/to/cgit
-        git config --global instacgit.datadir /path/to/directory/
-
-"instacgit.datadir" should contain "cgit.css".
-''')
+        if not all(p and os.path.exists(p)
+                   for p in (self.cgit_path, self.cgit_datadir)):
+            sys.stderr.write(CGIT_NOT_FOUND_MESSAGE)
             return 1
 
         server = CGitServer(('localhost', 8080),
