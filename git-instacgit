@@ -80,13 +80,23 @@ def get_config_path(var):
     return value
 
 
-def create_cgitrc(git_dir, path):
-    repo_path = get_output('git', 'rev-parse', '--show-toplevel')
-    if not repo_path:
-        repo_path = git_dir
+class InstaCGit(object):
 
-    with open(path, 'w') as f:
-        f.write('''
+    def __init__(self, git_dir, cgit_datadir, cgit_path, cgitrc_file=None):
+        self.git_dir = git_dir
+        self.cgit_datadir = cgit_datadir
+        self.cgit_path = cgit_path
+        if cgitrc_file is None:
+            cgitrc_file = os.path.join(self.git_dir, 'cgitrc')
+        self.cgitrc_file = cgitrc_file
+
+    def create_cgitrc(self):
+        repo_path = get_output('git', 'rev-parse', '--show-toplevel')
+        if not repo_path:
+            repo_path = self.git_dir
+
+        with open(self.cgitrc_file, 'w') as f:
+            f.write('''
 enable-commit-graph=1
 enable-index-links=1
 enable-log-filecount=1
@@ -98,51 +108,55 @@ repo.url={name}
 repo.name={name}
 repo.path={path}
 '''.format(name=os.path.basename(repo_path),
-           path=git_dir))
+           path=self.git_dir))
 
+    def write_agefile(self):
+        web_dir = os.path.join(self.git_dir, 'info', 'web')
+        try:
+            os.makedirs(web_dir)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+        date = get_output('git', 'for-each-ref', '--count=1',
+                          '--sort=-committerdate',
+                          '--format=%(committerdate:iso)')
+        with open(os.path.join(web_dir, 'last-modified'), 'w') as f:
+            f.write('%s\n' % date)
 
-def write_agefile(git_dir):
-    web_dir = os.path.join(git_dir, 'info', 'web')
-    try:
-        os.makedirs(web_dir)
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            raise
-    date = get_output('git', 'for-each-ref', '--count=1',
-                      '--sort=-committerdate',
-                      '--format=%(committerdate:iso)')
-    with open(os.path.join(web_dir, 'last-modified'), 'w') as f:
-        f.write('%s\n' % date)
+    def run(self):
+        self.create_cgitrc()
+        self.write_agefile()
 
-
-def main(args):
-    git_dir = get_output('git', 'rev-parse', '--git-dir')
-    cgitrc_file = os.path.join(git_dir, 'cgitrc')
-    create_cgitrc(git_dir, cgitrc_file)
-    write_agefile(git_dir)
-
-    os.environ['CGIT_CONFIG'] = cgitrc_file
-    cgit_path = get_config_path('instacgit.script')
-    cgit_datadir = get_config_path('instacgit.datadir')
-    if not cgit_path or not cgit_datadir:
-        sys.stderr.write('''fatal: cgit not found
+        os.environ['CGIT_CONFIG'] = self.cgitrc_file
+        if not self.cgit_path or not self.cgit_datadir:
+            sys.stderr.write('''fatal: cgit not found
 
 You must tell git-instacgit how to find CGit on your system:
 
-	git config --global instacgit.script /path/to/cgit
+        git config --global instacgit.script /path/to/cgit
         git config --global instacgit.datadir /path/to/directory/
 
 "instacgit.datadir" should contain "cgit.css".
 ''')
-        return 1
+            return 1
 
-    server = CGitServer(('localhost', 8080), cgit_path, cgit_datadir)
-    subprocess.Popen(['git', 'web--browse', 'http://localhost:8080/cgit/'])
-    try:
-        print('starting server')
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
+        server = CGitServer(('localhost', 8080),
+                            self.cgit_path,
+                            self.cgit_datadir)
+        subprocess.Popen(['git', 'web--browse', 'http://localhost:8080/cgit/'])
+        try:
+            print('starting server')
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+
+
+def main(args):
+    InstaCGit(
+        git_dir=get_output('git', 'rev-parse', '--git-dir'),
+        cgit_path=get_config_path('instacgit.script'),
+        cgit_datadir=get_config_path('instacgit.datadir')
+    ).run()
     return 0
 
 
