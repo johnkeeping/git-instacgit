@@ -35,7 +35,11 @@ class CGitRequestHandler(CGIHTTPRequestHandler):
 
 
 class CGitServer(ThreadingMixIn, HTTPServer):
-    pass
+
+    def __init__(self, server_address, cgit_path, cgit_datadir):
+        def handle_request(*args):
+            return CGitRequestHandler(cgit_path, cgit_datadir, *args)
+        HTTPServer.__init__(self, server_address, handle_request)
 
 
 def _decode_output(value):
@@ -129,9 +133,7 @@ You must tell git-instacgit how to find CGit on your system:
 ''')
         return 1
 
-    def handle_request(*args):
-        return CGitRequestHandler(cgit_path, cgit_datadir, *args)
-    server = CGitServer(('localhost', 8080), handle_request)
+    server = CGitServer(('localhost', 8080), cgit_path, cgit_datadir)
     subprocess.Popen(['git', 'web--browse', 'http://localhost:8080/cgit/'])
     try:
         print('starting server')
