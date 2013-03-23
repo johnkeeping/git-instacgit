@@ -91,6 +91,20 @@ You must tell git-instacgit how to find CGit on your system:
 '''
 
 
+CGITRC_CONTENT = '''
+enable-commit-graph=1
+enable-index-links=1
+enable-log-filecount=1
+enable-log-linecount=1
+enable-git-config=1
+max-stats=year
+
+repo.url={name}
+repo.name={name}
+repo.path={path}
+'''
+
+
 class InstaCGit(object):
 
     def __init__(self, git_dir, cgit_datadir, cgit_path=None, cgitrc_file=None):
@@ -109,19 +123,8 @@ class InstaCGit(object):
             repo_path = self.git_dir
 
         with open(self.cgitrc_file, 'w') as f:
-            f.write('''
-enable-commit-graph=1
-enable-index-links=1
-enable-log-filecount=1
-enable-log-linecount=1
-enable-git-config=1
-max-stats=year
-
-repo.url={name}
-repo.name={name}
-repo.path={path}
-'''.format(name=os.path.basename(repo_path),
-           path=self.git_dir))
+            f.write(CGITRC_CONTENT.format(name=os.path.basename(repo_path),
+                                          path=self.git_dir))
 
     def write_agefile(self):
         web_dir = os.path.join(self.git_dir, 'info', 'web')
