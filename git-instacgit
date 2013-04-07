@@ -100,9 +100,23 @@ enable-log-linecount=1
 enable-git-config=1
 max-stats=year
 
+module-link=/cgit/submodule/%s/commit?id=%s
+
 repo.url={name}
 repo.name={name}
 repo.path={path}
+'''
+
+PRINT_SUBMODULE_COMMAND = '''echo "repo.url=submodule/$sm_path"
+if test "$name" = "$sm_path"
+then
+    echo "repo.name={name}/$sm_path"
+else
+    echo "repo.name=$name"
+fi
+echo "repo.section=Submodules"
+echo "repo.path=$(cd "$(git rev-parse --git-dir)" && pwd)"
+echo
 '''
 
 
@@ -123,9 +137,12 @@ class InstaCGit(object):
         if not repo_path:
             repo_path = self.git_dir
 
+        name = os.path.basename(repo_path)
         with open(self.cgitrc_file, 'w') as f:
-            f.write(CGITRC_CONTENT.format(name=os.path.basename(repo_path),
+            f.write(CGITRC_CONTENT.format(name=name,
                                           path=self.git_dir))
+            f.write(get_output('git', 'submodule', 'foreach', '--quiet',
+                               PRINT_SUBMODULE_COMMAND).format(name=name))
 
     def write_agefile(self):
         web_dir = os.path.join(self.git_dir, 'info', 'web')
