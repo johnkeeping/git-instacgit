@@ -125,7 +125,7 @@ class InstaCGit(object):
     def __init__(self, git_dir, cgit_datadir, cgit_path=None, cgitrc_file=None):
         self.git_dir = git_dir
         self.cgit_datadir = cgit_datadir
-        if cgit_path is None:
+        if cgit_path is None and self.cgit_datadir is not None:
             cgit_path = os.path.join(self.cgit_datadir, 'cgit')
         self.cgit_path = cgit_path
         if cgitrc_file is None:
