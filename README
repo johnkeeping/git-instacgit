@@ -32,3 +32,16 @@ Running
 =======
 
 Type "git instacgit" inside a Git repository.
+
+
+Configuration
+=============
+
+"git instacgit" is configured through "git config".  In addition to the
+"instacgit.script" and "instacgit.datadir" described above, keys of the form
+"instacgit.config.*" are also recognized.  These are used to configure CGit in
+addition to the default configuration.
+
+For example, if you want to turn off the commit graph:
+
+    git config instacgit.config.enable-commit-graph 0
