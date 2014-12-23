@@ -23,7 +23,10 @@ class CGitRequestHandler(CGIHTTPRequestHandler):
     def is_cgi(self):
         if self.path == '/':
             self.path = '/cgit/'
-        self.cgi_info = ('', self.path)
+        path = self.path
+        if path.startswith('/'):
+            path = path[1:]
+        self.cgi_info = ('', path)
         return self.path.startswith('/cgit/')
 
     def translate_path(self, path):
