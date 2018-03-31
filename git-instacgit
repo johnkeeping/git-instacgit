@@ -134,7 +134,7 @@ class InstaCGit(object):
             cgit_path = os.path.join(self.cgit_datadir, 'cgit')
         self.cgit_path = cgit_path
         if cgitrc_file is None:
-            cgitrc_file = os.path.join(self.git_dir, 'cgitrc')
+            cgitrc_file = os.path.join(self.git_dir, 'instacgitrc')
         self.cgitrc_file = cgitrc_file
         self.config = list(self.DEFAULT_CONFIG.items())
 
